@@ -187,7 +187,8 @@
 
         queryCommandState: function () {
             var queryState = null;
-            if (this.useQueryState) {
+
+            if (this.base.options.useQueryState && this.useQueryState) {
                 queryState = this.base.queryCommandState(this.getAction());
             }
             return queryState;

@@ -15,6 +15,7 @@
         ownerDocument: document,
         targetBlank: false,
         extensions: {},
-        spellcheck: true
+        spellcheck: true,
+        useQuerySate: true
     };
 })();
