@@ -102,6 +102,7 @@
 
             this.button = this.createButton();
             this.on(this.button, 'click', this.handleClick.bind(this));
+            this.on(this.button, 'touchend', this.handleClick.bind(this));
         },
 
         /* getButton: [function ()]

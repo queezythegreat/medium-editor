@@ -3223,6 +3223,7 @@ MediumEditor.extensions = {};
 
             this.button = this.createButton();
             this.on(this.button, 'click', this.handleClick.bind(this));
+            this.on(this.button, 'touchend', this.handleClick.bind(this));
         },
 
         /* getButton: [function ()]
@@ -5978,6 +5979,13 @@ MediumEditor.extensions = {};
          */
         supportTouch: false,
 
+        /* position: [string]
+         * Position the toolbar around selection either: above | below.
+         */
+        position: null,
+
+        allowEmptySelection: false,
+
         init: function () {
             MediumEditor.Extension.prototype.init.apply(this, arguments);
 
@@ -6141,6 +6149,9 @@ MediumEditor.extensions = {};
             if (this.isTouchDevice()) {
                 // Support selectionchange: http://stackoverflow.com/questions/15076173/end-of-text-selection-event
                 document.addEventListener('selectionchange', function (event) {
+                    if (this.isToolbarDefaultActionsDisplayed()) {
+                        this.handleBlur(event);
+                    }
                     clearTimeout(this._selectionEndTimer);
                     this._selectionEndTimer = setTimeout(function () {
                         if (this.isToolbarDefaultActionsDisplayed()) {
@@ -6181,11 +6192,14 @@ MediumEditor.extensions = {};
             this.checkState();
         },
 
+        isClicked: false,
         handleEditableClick: function () {
             // Delay the call to checkState to handle bug where selection is empty
             // immediately after clicking inside a pre-existing selection
             setTimeout(function () {
+                this.isClicked = true;
                 this.checkState();
+                this.isClicked = false;
             }.bind(this), 0);
         },
 
@@ -6341,6 +6355,12 @@ MediumEditor.extensions = {};
                 return this.showAndUpdateToolbar();
             }
 
+            if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
+                if (this.isClicked) {
+                    return this.showAndUpdateToolbar();
+                }
+            }
+
             // If we don't have a 'valid' selection -> hide toolbar
             if (!MediumEditor.selection.selectionContainsContent(this.document) ||
                 (this.allowMultiParagraphSelection === false && this.multipleBlockElementsSelected())) {
@@ -6448,7 +6468,7 @@ MediumEditor.extensions = {};
                 return this;
             }
 
-            if (this.static || !selection.isCollapsed) {
+            if (this.static || !selection.isCollapsed || this.allowEmptySelection) {
                 this.showToolbar();
 
                 // we don't need any absolute positioning if relativeContainer is set
@@ -6523,8 +6543,16 @@ MediumEditor.extensions = {};
 
         isTouchDevice: function () {
             return (('ontouchstart' in document.documentElement) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0)) &&
-                this.supportTouch === true &&
-                navigator.userAgent.indexOf('PhantomJS') === -1;
+                   this.supportTouch === true &&
+                   navigator.userAgent.indexOf('PhantomJS') === -1;
+        },
+
+        isIOS: function () {
+            var userAgent = window.navigator.userAgent;
+            // See: https://stackoverflow.com/questions/3007480/determine-if-user-navigated-from-mobile-safari/29696509#29696509
+            return (!!userAgent.match(/iPad/i) || !!userAgent.match(/iPhone/i)) &&
+                    !!userAgent.match(/WebKit/i) &&
+                    !userAgent.match(/CriOS/i);
         },
 
         positionToolbar: function (selection) {
@@ -6550,7 +6578,7 @@ MediumEditor.extensions = {};
                 toolbarHeight = toolbarElement.offsetHeight,
                 toolbarWidth = toolbarElement.offsetWidth,
                 halfOffsetWidth = toolbarWidth / 2,
-                buttonHeight = 50,
+                //buttonHeight = 50,
                 defaultLeft = this.diffLeft - halfOffsetWidth,
                 elementsContainer = this.getEditorOption('elementsContainer'),
                 elementsContainerAbsolute = ['absolute', 'fixed'].indexOf(window.getComputedStyle(elementsContainer).getPropertyValue('position')) > -1,
@@ -6579,8 +6607,23 @@ MediumEditor.extensions = {};
             }
 
             middleBoundary = boundary.left + boundary.width / 2;
-            positions.top += boundary.top - toolbarHeight;
 
+            var positionToolbar = this.position;
+            if (this.isTouchDevice()) {
+                positionToolbar = (this.isIOS()) ? 'bottom' : positionToolbar;
+            }
+
+            if (positionToolbar !== 'bottom') {
+                toolbarElement.classList.add('medium-toolbar-arrow-under');
+                toolbarElement.classList.remove('medium-toolbar-arrow-over');
+                positions.top += boundary.top - toolbarHeight + this.diffTop;
+            } else {
+                toolbarElement.classList.add('medium-toolbar-arrow-over');
+                toolbarElement.classList.remove('medium-toolbar-arrow-under');
+                positions.top += boundary.bottom - this.diffTop;
+            }
+
+            /**
             if (boundary.top < buttonHeight) {
                 toolbarElement.classList.add('medium-toolbar-arrow-over');
                 toolbarElement.classList.remove('medium-toolbar-arrow-under');
@@ -6590,6 +6633,7 @@ MediumEditor.extensions = {};
                 toolbarElement.classList.remove('medium-toolbar-arrow-over');
                 positions.top += this.diffTop;
             }
+             **/
 
             if (middleBoundary < halfOffsetWidth) {
                 positions.left = defaultLeft + halfOffsetWidth;
