@@ -1024,7 +1024,7 @@
         getTopBlockContainer: function (element) {
             var topBlock = Util.isBlockContainer(element) ? element : false;
             Util.traverseUp(element, function (el) {
-                if (Util.isBlockContainer(el)) {
+                if (Util.isBlockContainer(el) && !Util.isMediumEditorElement(el)) {
                     topBlock = el;
                 }
                 if (!topBlock && Util.isMediumEditorElement(el)) {

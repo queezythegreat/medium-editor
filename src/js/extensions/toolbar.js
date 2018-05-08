@@ -95,6 +95,8 @@
 
         allowEmptySelection: false,
 
+        allowEmptySelectionIn: [],
+
         init: function () {
             MediumEditor.Extension.prototype.init.apply(this, arguments);
 
@@ -466,6 +468,10 @@
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
                 if (this.isClicked) {
+                    var parentNodeName = this.window.getSelection().baseNode.parentNode.nodeName;
+                    if (this.allowEmptySelectionIn.indexOf(parentNodeName) === -1) {
+                        return this.hideToolbar();
+                    }
                     return this.showAndUpdateToolbar();
                 }
             }

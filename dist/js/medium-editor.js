@@ -1430,7 +1430,7 @@ MediumEditor.extensions = {};
         getTopBlockContainer: function (element) {
             var topBlock = Util.isBlockContainer(element) ? element : false;
             Util.traverseUp(element, function (el) {
-                if (Util.isBlockContainer(el)) {
+                if (Util.isBlockContainer(el) && !Util.isMediumEditorElement(el)) {
                     topBlock = el;
                 }
                 if (!topBlock && Util.isMediumEditorElement(el)) {
@@ -5986,6 +5986,8 @@ MediumEditor.extensions = {};
 
         allowEmptySelection: false,
 
+        allowEmptySelectionIn: [],
+
         init: function () {
             MediumEditor.Extension.prototype.init.apply(this, arguments);
 
@@ -6357,6 +6359,10 @@ MediumEditor.extensions = {};
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
                 if (this.isClicked) {
+                    var parentNodeName = this.window.getSelection().baseNode.parentNode.nodeName;
+                    if (this.allowEmptySelectionIn.indexOf(parentNodeName) === -1) {
+                        return this.hideToolbar();
+                    }
                     return this.showAndUpdateToolbar();
                 }
             }
