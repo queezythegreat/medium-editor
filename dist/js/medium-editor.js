@@ -522,6 +522,10 @@ MediumEditor.extensions = {};
             'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'
         ],
 
+        sectionContainerElementNames: [
+            'article', 'aside', 'footer', 'header', 'main', 'nav', 'section'
+        ],
+
         emptyElementNames: ['br', 'col', 'colgroup', 'hr', 'img', 'input', 'source', 'wbr'],
 
         extend: function extend(/* dest, source1, source2, ...*/) {
@@ -1411,6 +1415,10 @@ MediumEditor.extensions = {};
 
         isBlockContainer: function (element) {
             return element && element.nodeType !== 3 && Util.blockContainerElementNames.indexOf(element.nodeName.toLowerCase()) !== -1;
+        },
+
+        isSectionContainer: function (element) {
+            return element && element.nodeType !== 3 && Util.sectionContainerElementNames.indexOf(element.nodeName.toLowerCase()) !== -1;
         },
 
         /* Finds the closest ancestor which is a block container element
@@ -6359,8 +6367,9 @@ MediumEditor.extensions = {};
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
                 if (this.isClicked) {
-                    var parentNodeName = this.window.getSelection().baseNode.parentNode.nodeName;
-                    if (this.allowEmptySelectionIn.indexOf(parentNodeName) === -1) {
+                    var selection = this.window.getSelection(),
+                         nodeName = (selection.baseNode.nodeType === 3) ? selection.baseNode.parentNode.nodeName : selection.baseNode.nodeName;
+                    if (this.allowEmptySelectionIn.indexOf(nodeName) === -1) {
                         return this.hideToolbar();
                     }
                     return this.showAndUpdateToolbar();
@@ -6899,7 +6908,7 @@ MediumEditor.extensions = {};
 
         // https://github.com/yabwe/medium-editor/issues/994
         // Firefox thrown an error when calling `formatBlock` on an empty editable blockContainer that's not a <div>
-        if (MediumEditor.util.isMediumEditorElement(node) && node.children.length === 0 && !MediumEditor.util.isBlockContainer(node)) {
+        if (MediumEditor.util.isMediumEditorElement(node) && node.children.length === 0 && (!MediumEditor.util.isBlockContainer(node) || MediumEditor.util.isSectionContainer(node))) {
             this.options.ownerDocument.execCommand('formatBlock', false, 'p');
         }
 

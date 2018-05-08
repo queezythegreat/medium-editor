@@ -468,8 +468,9 @@
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
                 if (this.isClicked) {
-                    var parentNodeName = this.window.getSelection().baseNode.parentNode.nodeName;
-                    if (this.allowEmptySelectionIn.indexOf(parentNodeName) === -1) {
+                    var selection = this.window.getSelection(),
+                         nodeName = (selection.baseNode.nodeType === 3) ? selection.baseNode.parentNode.nodeName : selection.baseNode.nodeName;
+                    if (this.allowEmptySelectionIn.indexOf(nodeName) === -1) {
                         return this.hideToolbar();
                     }
                     return this.showAndUpdateToolbar();

@@ -116,6 +116,10 @@
             'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'
         ],
 
+        sectionContainerElementNames: [
+            'article', 'aside', 'footer', 'header', 'main', 'nav', 'section'
+        ],
+
         emptyElementNames: ['br', 'col', 'colgroup', 'hr', 'img', 'input', 'source', 'wbr'],
 
         extend: function extend(/* dest, source1, source2, ...*/) {
@@ -1005,6 +1009,10 @@
 
         isBlockContainer: function (element) {
             return element && element.nodeType !== 3 && Util.blockContainerElementNames.indexOf(element.nodeName.toLowerCase()) !== -1;
+        },
+
+        isSectionContainer: function (element) {
+            return element && element.nodeType !== 3 && Util.sectionContainerElementNames.indexOf(element.nodeName.toLowerCase()) !== -1;
         },
 
         /* Finds the closest ancestor which is a block container element
