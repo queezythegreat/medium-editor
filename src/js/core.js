@@ -1204,6 +1204,28 @@
             return null;
         },
 
+        isCursorAtStart: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+            caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            return caretPositions.left === 0;
+        },
+
+        isCursorAtEnd: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+                textContent = node.textContent,
+                caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            return this.options.ownerDocument.getSelection().type === 'Caret' && caretPositions.right === 0;
+        },
+
+        getCursorPosition: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+                caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            return caretPositions.left;
+        },
+
         checkContentChanged: function (editable) {
             editable = editable || MediumEditor.selection.getSelectionElement(this.options.contentWindow);
             this.events.updateInput(editable, { target: editable, currentTarget: editable });

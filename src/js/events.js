@@ -291,6 +291,7 @@
                     // Detecting when user has interacted with elements outside of MediumEditor
                     this.attachDOMEvent(this.options.ownerDocument.body, 'mousedown', this.handleBodyMousedown.bind(this), true);
                     this.attachDOMEvent(this.options.ownerDocument.body, 'click', this.handleBodyClick.bind(this), true);
+                    this.attachDOMEvent(this.options.ownerDocument.body, 'touchstart', this.handleBodyClick.bind(this), true);
                     this.attachDOMEvent(this.options.ownerDocument.body, 'focus', this.handleBodyFocus.bind(this), true);
                     break;
                 case 'blur':
@@ -326,6 +327,8 @@
                 case 'editableClick':
                     // Detecting click in the contenteditables
                     this.attachToEachElement('click', this.handleClick);
+                    this.attachToEachElement('touchstart', this.handleClick);
+
                     break;
                 case 'editableBlur':
                     // Detecting blur in the contenteditables

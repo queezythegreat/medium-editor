@@ -260,13 +260,15 @@
             if (this.isTouchDevice()) {
                 // Support selectionchange: http://stackoverflow.com/questions/15076173/end-of-text-selection-event
                 document.addEventListener('selectionchange', function (event) {
-                    if (this.isToolbarDefaultActionsDisplayed()) {
+                    if (this.isToolbarDefaultActionsDisplayed() && !this.standardizeSelectionStart) {
+                        // If standardizeSelectionStart, the selection is modified and we have a infiinite loop
                         this.handleBlur(event);
                     }
+
                     clearTimeout(this._selectionEndTimer);
                     this._selectionEndTimer = setTimeout(function () {
                         if (this.isToolbarDefaultActionsDisplayed()) {
-                            this.handleDocumentMouseup(event);
+                            this.handleDocumentSelectionchange(event);
                         }
                     }.bind(this), 500);
                 }.bind(this));
@@ -303,19 +305,37 @@
             this.checkState();
         },
 
-        isClicked: false,
+        handleDocumentSelectionchange: function () {
+            // Do not trigger checkState when mouseup fires over the toolbar
+            if (this.wasKeyup) {
+                return false;
+            }
+            this.wasClick = true;
+            this.checkState();
+            this.wasClick = false;
+        },
+
+        wasClick: false,
         handleEditableClick: function () {
             // Delay the call to checkState to handle bug where selection is empty
             // immediately after clicking inside a pre-existing selection
             setTimeout(function () {
-                this.isClicked = true;
+                this.wasClick = true;
                 this.checkState();
-                this.isClicked = false;
+                this.wasClick = false;
             }.bind(this), 0);
         },
 
+        wasKeyup: null,
         handleEditableKeyup: function () {
+            clearTimeout(this.wasKeyup);
+            this.wasKeyup = setTimeout(function () {
+                this.wasKeyup = null;
+            }.bind(this), 500);
+
+            this.hideToolbar();
             this.checkState();
+
         },
 
         handleBlur: function () {
@@ -431,7 +451,7 @@
                     while (adjacentNode.nodeValue.substr(offset, 1).trim().length === 0) {
                         offset = offset + 1;
                     }
-                    selectionRange = MediumEditor.selection.select(this.document, adjacentNode, offset,
+                    this.selectionRange = MediumEditor.selection.select(this.document, adjacentNode, offset,
                         selectionRange.endContainer, selectionRange.endOffset);
                 }
             }
@@ -467,10 +487,11 @@
             }
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
-                if (this.isClicked) {
-                    var selection = this.window.getSelection(),
-                         nodeName = (selection.baseNode.nodeType === 3) ? selection.baseNode.parentNode.nodeName : selection.baseNode.nodeName;
-                    if (this.allowEmptySelectionIn.indexOf(nodeName) === -1) {
+                if (this.wasClick) {
+                    var isEmpty = /^(\s+|<br\/?>)?$/i,
+                           node = MediumEditor.selection.getSelectionStart(this.base.options.ownerDocument);
+
+                    if (this.allowEmptySelectionIn.indexOf(node.nodeName) === -1 || !isEmpty.test(node.innerHTML)) {
                         return this.hideToolbar();
                     }
                     return this.showAndUpdateToolbar();
@@ -685,7 +706,23 @@
                 if (range.startContainer.nodeType === 1 && range.startContainer.querySelector('img')) {
                     boundary = range.startContainer.querySelector('img').getBoundingClientRect();
                 } else {
-                    boundary = range.startContainer.getBoundingClientRect();
+                    if (range.startContainer.nodeType === 3) {
+                        boundary = range.getClientRects()[0];
+                    } else {
+                        boundary = range.startContainer.getBoundingClientRect();
+                        if (selection.type === 'Caret') {
+                            boundary = {
+                                'x': boundary.x,
+                                'y': boundary.y,
+                                'width': 0, // Resetting width, so the toolbar is centered over Caret
+                                'height': boundary.height,
+                                'top': boundary.top,
+                                'right':boundary.right ,
+                                'bottom': boundary.bottom,
+                                'left': boundary.left
+                            };
+                        }
+                    }
                 }
             }
 

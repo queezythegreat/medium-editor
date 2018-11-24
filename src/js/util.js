@@ -700,19 +700,64 @@
         },
 
         cleanListDOM: function (ownerDocument, element) {
-            if (element.nodeName.toLowerCase() !== 'li') {
+            var selection = ownerDocument.getSelection(),
+                newRange = ownerDocument.createRange(),
+                oldRange = selection.getRangeAt(0),
+                startContainer = oldRange.startContainer,
+                startOffset = oldRange.startOffset,
+                endContainer = oldRange.endContainer,
+                endOffset = oldRange.endOffset,
+                node, newNode, nextNode, moveEndOffset;
+
+            if (element.nodeName.toLowerCase() !== 'span') {
                 if (this.isIE || this.isEdge) {
                     return;
                 }
 
-                var selection = ownerDocument.getSelection(),
-                    newRange = ownerDocument.createRange(),
-                    oldRange = selection.getRangeAt(0),
-                    startContainer = oldRange.startContainer,
-                    startOffset = oldRange.startOffset,
-                    endContainer = oldRange.endContainer,
-                    endOffset = oldRange.endOffset,
-                    node, newNode, nextNode, moveEndOffset;
+                window.console.log('cleanup 2', element.nodeName.toLowerCase(), element, element.parentNode.innerHTML);
+                if (element.nodeName.toLowerCase() === 'span') {
+                    // Chrome & Safari unwraps removed li elements into a span
+                    node = element;
+                    moveEndOffset = false;
+                } else {
+                    // FF leaves them as text nodes
+                    node = this.findFirstTextNodeInSelection(selection);
+                    moveEndOffset = startContainer.nodeType !== 3;
+                }
+
+                while (node) {
+                    window.console.log(node, node.nodeType);
+                    if (node.nodeName.toLowerCase() !== 'span' && node.nodeType !== 3) {
+                        break;
+                    }
+
+                    if (node.nextSibling && node.nextSibling.nodeName.toLowerCase() === 'br') {
+                        node.nextSibling.remove();
+
+                        if (moveEndOffset) {
+                            endOffset--;
+                        }
+                    }
+
+                    nextNode = node.nextSibling;
+
+                    newNode = ownerDocument.createElement('p');
+                    window.console.log(node, node.nodeType);
+                    node.parentNode.replaceChild(newNode, node);
+                    newNode.appendChild(node);
+
+                    node = nextNode;
+                }
+
+                // Restore selection
+                newRange.setStart(startContainer, startOffset);
+                newRange.setEnd(endContainer, endOffset);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+            } else if (element.nodeName.toLowerCase() !== 'li') {
+                if (this.isIE || this.isEdge) {
+                    return;
+                }
 
                 if (element.nodeName.toLowerCase() === 'span') {
                     // Chrome & Safari unwraps removed li elements into a span

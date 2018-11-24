@@ -1106,19 +1106,64 @@ MediumEditor.extensions = {};
         },
 
         cleanListDOM: function (ownerDocument, element) {
-            if (element.nodeName.toLowerCase() !== 'li') {
+            var selection = ownerDocument.getSelection(),
+                newRange = ownerDocument.createRange(),
+                oldRange = selection.getRangeAt(0),
+                startContainer = oldRange.startContainer,
+                startOffset = oldRange.startOffset,
+                endContainer = oldRange.endContainer,
+                endOffset = oldRange.endOffset,
+                node, newNode, nextNode, moveEndOffset;
+
+            if (element.nodeName.toLowerCase() !== 'span') {
                 if (this.isIE || this.isEdge) {
                     return;
                 }
 
-                var selection = ownerDocument.getSelection(),
-                    newRange = ownerDocument.createRange(),
-                    oldRange = selection.getRangeAt(0),
-                    startContainer = oldRange.startContainer,
-                    startOffset = oldRange.startOffset,
-                    endContainer = oldRange.endContainer,
-                    endOffset = oldRange.endOffset,
-                    node, newNode, nextNode, moveEndOffset;
+                window.console.log('cleanup 2', element.nodeName.toLowerCase(), element, element.parentNode.innerHTML);
+                if (element.nodeName.toLowerCase() === 'span') {
+                    // Chrome & Safari unwraps removed li elements into a span
+                    node = element;
+                    moveEndOffset = false;
+                } else {
+                    // FF leaves them as text nodes
+                    node = this.findFirstTextNodeInSelection(selection);
+                    moveEndOffset = startContainer.nodeType !== 3;
+                }
+
+                while (node) {
+                    window.console.log(node, node.nodeType);
+                    if (node.nodeName.toLowerCase() !== 'span' && node.nodeType !== 3) {
+                        break;
+                    }
+
+                    if (node.nextSibling && node.nextSibling.nodeName.toLowerCase() === 'br') {
+                        node.nextSibling.remove();
+
+                        if (moveEndOffset) {
+                            endOffset--;
+                        }
+                    }
+
+                    nextNode = node.nextSibling;
+
+                    newNode = ownerDocument.createElement('p');
+                    window.console.log(node, node.nodeType);
+                    node.parentNode.replaceChild(newNode, node);
+                    newNode.appendChild(node);
+
+                    node = nextNode;
+                }
+
+                // Restore selection
+                newRange.setStart(startContainer, startOffset);
+                newRange.setEnd(endContainer, endOffset);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+            } else if (element.nodeName.toLowerCase() !== 'li') {
+                if (this.isIE || this.isEdge) {
+                    return;
+                }
 
                 if (element.nodeName.toLowerCase() === 'span') {
                     // Chrome & Safari unwraps removed li elements into a span
@@ -2820,6 +2865,7 @@ MediumEditor.extensions = {};
                     // Detecting when user has interacted with elements outside of MediumEditor
                     this.attachDOMEvent(this.options.ownerDocument.body, 'mousedown', this.handleBodyMousedown.bind(this), true);
                     this.attachDOMEvent(this.options.ownerDocument.body, 'click', this.handleBodyClick.bind(this), true);
+                    this.attachDOMEvent(this.options.ownerDocument.body, 'touchstart', this.handleBodyClick.bind(this), true);
                     this.attachDOMEvent(this.options.ownerDocument.body, 'focus', this.handleBodyFocus.bind(this), true);
                     break;
                 case 'blur':
@@ -2855,6 +2901,8 @@ MediumEditor.extensions = {};
                 case 'editableClick':
                     // Detecting click in the contenteditables
                     this.attachToEachElement('click', this.handleClick);
+                    this.attachToEachElement('touchstart', this.handleClick);
+
                     break;
                 case 'editableBlur':
                     // Detecting blur in the contenteditables
@@ -6159,13 +6207,15 @@ MediumEditor.extensions = {};
             if (this.isTouchDevice()) {
                 // Support selectionchange: http://stackoverflow.com/questions/15076173/end-of-text-selection-event
                 document.addEventListener('selectionchange', function (event) {
-                    if (this.isToolbarDefaultActionsDisplayed()) {
+                    if (this.isToolbarDefaultActionsDisplayed() && !this.standardizeSelectionStart) {
+                        // If standardizeSelectionStart, the selection is modified and we have a infiinite loop
                         this.handleBlur(event);
                     }
+
                     clearTimeout(this._selectionEndTimer);
                     this._selectionEndTimer = setTimeout(function () {
                         if (this.isToolbarDefaultActionsDisplayed()) {
-                            this.handleDocumentMouseup(event);
+                            this.handleDocumentSelectionchange(event);
                         }
                     }.bind(this), 500);
                 }.bind(this));
@@ -6202,19 +6252,37 @@ MediumEditor.extensions = {};
             this.checkState();
         },
 
-        isClicked: false,
+        handleDocumentSelectionchange: function () {
+            // Do not trigger checkState when mouseup fires over the toolbar
+            if (this.wasKeyup) {
+                return false;
+            }
+            this.wasClick = true;
+            this.checkState();
+            this.wasClick = false;
+        },
+
+        wasClick: false,
         handleEditableClick: function () {
             // Delay the call to checkState to handle bug where selection is empty
             // immediately after clicking inside a pre-existing selection
             setTimeout(function () {
-                this.isClicked = true;
+                this.wasClick = true;
                 this.checkState();
-                this.isClicked = false;
+                this.wasClick = false;
             }.bind(this), 0);
         },
 
+        wasKeyup: null,
         handleEditableKeyup: function () {
+            clearTimeout(this.wasKeyup);
+            this.wasKeyup = setTimeout(function () {
+                this.wasKeyup = null;
+            }.bind(this), 500);
+
+            this.hideToolbar();
             this.checkState();
+
         },
 
         handleBlur: function () {
@@ -6330,7 +6398,7 @@ MediumEditor.extensions = {};
                     while (adjacentNode.nodeValue.substr(offset, 1).trim().length === 0) {
                         offset = offset + 1;
                     }
-                    selectionRange = MediumEditor.selection.select(this.document, adjacentNode, offset,
+                    this.selectionRange = MediumEditor.selection.select(this.document, adjacentNode, offset,
                         selectionRange.endContainer, selectionRange.endOffset);
                 }
             }
@@ -6366,10 +6434,11 @@ MediumEditor.extensions = {};
             }
 
             if (this.allowEmptySelection && !MediumEditor.selection.selectionContainsContent(this.document)) {
-                if (this.isClicked) {
-                    var selection = this.window.getSelection(),
-                         nodeName = (selection.baseNode.nodeType === 3) ? selection.baseNode.parentNode.nodeName : selection.baseNode.nodeName;
-                    if (this.allowEmptySelectionIn.indexOf(nodeName) === -1) {
+                if (this.wasClick) {
+                    var isEmpty = /^(\s+|<br\/?>)?$/i,
+                           node = MediumEditor.selection.getSelectionStart(this.base.options.ownerDocument);
+
+                    if (this.allowEmptySelectionIn.indexOf(node.nodeName) === -1 || !isEmpty.test(node.innerHTML)) {
                         return this.hideToolbar();
                     }
                     return this.showAndUpdateToolbar();
@@ -6584,7 +6653,23 @@ MediumEditor.extensions = {};
                 if (range.startContainer.nodeType === 1 && range.startContainer.querySelector('img')) {
                     boundary = range.startContainer.querySelector('img').getBoundingClientRect();
                 } else {
-                    boundary = range.startContainer.getBoundingClientRect();
+                    if (range.startContainer.nodeType === 3) {
+                        boundary = range.getClientRects()[0];
+                    } else {
+                        boundary = range.startContainer.getBoundingClientRect();
+                        if (selection.type === 'Caret') {
+                            boundary = {
+                                'x': boundary.x,
+                                'y': boundary.y,
+                                'width': 0, // Resetting width, so the toolbar is centered over Caret
+                                'height': boundary.height,
+                                'top': boundary.top,
+                                'right':boundary.right ,
+                                'bottom': boundary.bottom,
+                                'left': boundary.left
+                            };
+                        }
+                    }
                 }
             }
 
@@ -7934,6 +8019,29 @@ MediumEditor.extensions = {};
                 return this.elements[index].innerHTML.trim();
             }
             return null;
+        },
+
+        isCursorAtStart: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+            caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            return caretPositions.left === 0;
+        },
+
+        isCursorAtEnd: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+                textContent = node.textContent,
+                caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            window.console.log(caretPositions.left, caretPositions.right, textContent.length);
+            return this.options.ownerDocument.getSelection().type === 'Caret' && caretPositions.right === 0;
+        },
+
+        getCursorPosition: function () {
+            var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
+                caretPositions = MediumEditor.selection.getCaretOffsets(node);
+
+            return caretPositions.left;
         },
 
         checkContentChanged: function (editable) {
