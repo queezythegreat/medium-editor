@@ -1024,7 +1024,7 @@
         },
 
         restoreSelection: function () {
-            this.importSelection(this.selectionState);
+            this.importSelection(this.selectionState, true);
         },
 
         createLink: function (opts) {
@@ -1213,7 +1213,6 @@
 
         isCursorAtEnd: function () {
             var node = MediumEditor.selection.getSelectionStart(this.options.ownerDocument),
-                textContent = node.textContent,
                 caretPositions = MediumEditor.selection.getCaretOffsets(node);
 
             return this.options.ownerDocument.getSelection().type === 'Caret' && caretPositions.right === 0;
